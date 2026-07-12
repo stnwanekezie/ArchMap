@@ -418,6 +418,23 @@ function pick(sx, sy) {
 // --- side panel -----------------------------------------------------------
 function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function vscodeLink(n) { return 'vscode://file/' + n.abs_file + ':' + n.line; }
+// A plain <a href="vscode://..."> navigates the *current* document even with
+// target="_blank" inside VS Code's built-in Simple Browser / Live Preview
+// (which don't hand off custom schemes to the OS) — that blanks out the whole
+// graph. Attempt the protocol via a disposable hidden iframe instead, so a
+// failed handoff never destroys the visible page, and always copy path:line
+// to the clipboard first as a guaranteed Ctrl+P fallback either way.
+function openInVSCode(n) {
+  // Quick Open (Ctrl+P) fuzzy-matches on the filename — pasting the full
+  // repo-relative path returns no results, so copy just `name.py:line` here
+  // (the plain "Copy path" button below still copies the full path).
+  navigator.clipboard.writeText(n.file.split('/').pop() + ':' + n.line).catch(() => {});
+  const f = document.createElement('iframe');
+  f.style.display = 'none';
+  f.src = vscodeLink(n);
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 1000);
+}
 
 function relList(ids, label) {
   if (!ids || !ids.length) return '';
@@ -441,7 +458,7 @@ function selectNode(n) {
   body.innerHTML = `
     ${n.signature ? `<div class="sig">${esc(n.signature)}</div>` : ''}
     <div class="btnrow">
-      <a class="act primary" href="${vscodeLink(n)}">Open in VS Code</a>
+      <button class="act primary" id="btn-vscode" title="Also copies filename:line — if this doesn't jump directly (e.g. inside VS Code's built-in browser), press Ctrl+P and paste">Open in VS Code</button>
       <button class="act" id="btn-copy">Copy path</button>
       <button class="act" id="btn-ai">Describe with AI</button>
     </div>
@@ -460,6 +477,7 @@ function selectNode(n) {
     </div>
     ${n.source ? `<div class="sectlabel">Source &mdash; ${esc(n.file)}:${n.line}</div>
       <pre class="src">${esc(n.source)}</pre>` : ''}
+    ${relList(n.parent ? [n.parent] : null, 'Contained in')}
     ${relList(outCalls.get(n.id), 'Calls')}
     ${relList(inCalls.get(n.id), 'Called by')}
     ${relList(children.get(n.id), 'Contains')}
@@ -469,6 +487,13 @@ function selectNode(n) {
   document.getElementById('app').classList.add('panel-open');
   const copy = document.getElementById('btn-copy');
   if (copy) copy.onclick = () => navigator.clipboard.writeText(n.file + ':' + n.line);
+  const vsc = document.getElementById('btn-vscode');
+  if (vsc) vsc.onclick = () => {
+    openInVSCode(n);
+    const prev = vsc.textContent;
+    vsc.textContent = 'Opening… (path copied — Ctrl+P to jump if not)';
+    setTimeout(() => { vsc.textContent = prev; }, 2200);
+  };
   const ai = document.getElementById('btn-ai');
   if (ai) ai.onclick = () => describe(n);
   const send = document.getElementById('ai-send');
@@ -736,10 +761,23 @@ const searchCount = document.getElementById('search-count');
 function runSearch() {
   const q = search.value.trim().toLowerCase();
   searchHits = new Set();
-  if (q) for (const n of nodes)
-    if (n.name.toLowerCase().includes(q) || n.file.toLowerCase().includes(q))
-      searchHits.add(n.id);
-  searchCount.textContent = q ? (searchHits.size + ' match' + (searchHits.size === 1 ? '' : 'es')) : '';
+  if (q) {
+    for (const n of nodes)
+      if (n.name.toLowerCase().includes(q) || n.file.toLowerCase().includes(q)
+          || (n.source && n.source.toLowerCase().includes(q))
+          || (n.docstring && n.docstring.toLowerCase().includes(q))
+          || (n.signature && n.signature.toLowerCase().includes(q)))
+        searchHits.add(n.id);
+    const directCount = searchHits.size;
+    // bubble matches up to containing classes/modules so a hit deep inside is still visible
+    for (const id of [...searchHits]) {
+      let p = byId.get(id)?.parent;
+      while (p && !searchHits.has(p)) { searchHits.add(p); p = byId.get(p)?.parent; }
+    }
+    searchCount.textContent = directCount + ' match' + (directCount === 1 ? '' : 'es');
+  } else {
+    searchCount.textContent = '';
+  }
   draw();
 }
 search.oninput = runSearch;

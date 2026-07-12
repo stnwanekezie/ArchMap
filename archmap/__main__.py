@@ -2,7 +2,7 @@
 
 Usage (from the project root)::
 
-    python -m archmap --scan src                  # scan src/, write archmap.html
+    python -m archmap --scan src                  # scan src/, write pages/archmap.html
     python -m archmap --scan src tests            # multiple scan roots
     python -m archmap --out map.html              # custom output path
     python -m archmap --iterations 500            # denser layout relaxation
@@ -30,7 +30,9 @@ def main() -> None:
         help="source roots to scan, relative to cwd (default: src)",
     )
     ap.add_argument(
-        "--out", default="archmap.html", help="output HTML path (default: archmap.html)"
+        "--out",
+        default="../pages/archmap.html",
+        help="output HTML path (default: pages/archmap.html)",
     )
     ap.add_argument(
         "--iterations", type=int, default=320, help="layout relaxation steps"

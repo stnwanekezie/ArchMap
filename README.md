@@ -15,7 +15,7 @@ panel describes any node using a local model or your Claude subscription — and
 
 ![archmap — search a codebase; matches glow while the rest fades back, then Enter frames them](docs/search.gif)
 
-<sub>Recorded on a ~1,000-node Python backend. Regenerate the demos anytime with `python docs/record_demos.py`.</sub>
+<sub>Recorded on a ~1,000-node Python backend.</sub>
 
 ## Why
 
@@ -43,8 +43,8 @@ layer; the legend toggles whole layers, top pills toggle `contains` / `calls` /
 ![Filtering: toggling the calls relation and hiding layers to declutter the graph](docs/filter.gif)
 
 **Explore any node** — click for the signature, docstring, source snippet, a VS
-Code deep-link, and its `calls` / `called-by` / `contains` neighbours; click a
-neighbour to jump there.
+Code deep-link, and its `calls` / `called-by` / `contains` / `contained-in`
+neighbours; click a neighbour to jump there.
 
 ![Exploring a node: the side panel shows its source and neighbours, then jumps to a related node](docs/explore.gif)
 
@@ -68,24 +68,32 @@ git clone https://github.com/stnwanekezie/archmap.git
 cd archmap
 
 # Build the map for your package (graph only, fully offline):
-python -m archmap --scan src --out archmap.html
+python -m archmap --scan src   # writes pages/archmap.html
 
-# Open it — double-click, or:
-python -m http.server   # then browse to archmap.html
+# Open it — double-click pages/archmap.html, or serve it with the archmap
+# server (also enables the "Describe with AI" panel):
+python -m archmap.serve --no-build   # serves http://localhost:8777/archmap.html
 ```
 
-> **Inside a larger monorepo?** If the package lives at `tools/archmap/`, invoke
-> it as `python -m tools.archmap` (adjust the module path to wherever it sits).
+`--scan` accepts any path, so you don't have to stand inside the project
+you're mapping — point it at one relative to the clone root, or an absolute
+path:
+
+```bash
+python -m archmap --scan ../my-other-project/src
+```
+> `cwd` still determines where `pages/archmap.html` is read/written, so staying
+> inside `archmap/` keeps using `archmap/pages/archmap.html`.
 
 ## Usage
 
 ### Build the graph (`python -m archmap`)
 
-| Flag                   | Default        | Meaning                                                  |
-| ---------------------- | -------------- | -------------------------------------------------------- |
-| `--scan DIR [DIR ...]` | `src`          | Source roots to scan, relative to the current directory. |
-| `--out PATH`           | `archmap.html` | Output HTML path.                                        |
-| `--iterations N`       | `320`          | Force-layout relaxation steps (higher = tidier, slower). |
+| Flag                   | Default               | Meaning                                                  |
+| ---------------------- | ---------------------- | -------------------------------------------------------- |
+| `--scan DIR [DIR ...]` | `src`                  | Source roots to scan, relative to the current directory. |
+| `--out PATH`           | `pages/archmap.html`   | Output HTML path (the directory is created if needed).   |
+| `--iterations N`       | `320`                  | Force-layout relaxation steps (higher = tidier, slower). |
 
 ```bash
 python -m archmap --scan mypkg
@@ -98,11 +106,13 @@ in `__main__.py` (see [Adapting to your project](#adapting-to-your-project)).
 ### Navigate the map
 
 - **Pan** drag · **zoom** scroll · **click** a node for its side panel.
-- **Search** highlights matching functions/files; the **legend** (bottom-left)
-  toggles whole layers; the top pills toggle `contains` / `calls` / `imports`.
+- **Search** matches name, file, signature, docstring and source — a hit deep
+  inside a function also highlights its containing class/module; the
+  **legend** (bottom-left) toggles whole layers; the top pills toggle
+  `contains` / `calls` / `imports`.
 - The side panel shows the signature, docstring, source snippet, VS Code
-  deep-link, and the node's **Calls / Called by / Contains** neighbours (click to
-  jump). Drag the divider to widen the panel.
+  deep-link, and the node's **Contained in / Calls / Called by / Contains**
+  neighbours (click to jump). Drag the divider to widen the panel.
 
 ### AI descriptions (`python -m archmap.serve`)
 
@@ -293,23 +303,21 @@ The default is `--scan src`. If your source isn't under `src/`, always pass
 ## Project structure
 
 ```
-archmap/
-├── __main__.py       # build-only CLI:  python -m archmap
-├── extract.py        # AST → nodes + edges (high-precision call resolution)
-├── layout.py         # force-directed layout, baked into node coordinates
-├── render.py         # inline data + CSS + JS → self-contained HTML (+ the viewer/AI client)
-├── serve.py          # localhost server: static files + AI proxy (/chat, /session)
-├── live_session.py   # persistent Claude Code stream-json session wrapper
+archmap/                # clone root — cd here to run python -m archmap...
+├── archmap/             # the package
+│   ├── __init__.py
+│   ├── __main__.py       # build-only CLI:  python -m archmap
+│   ├── extract.py        # AST → nodes + edges (high-precision call resolution)
+│   ├── layout.py         # force-directed layout, baked into node coordinates
+│   ├── render.py         # inline data + CSS + JS → self-contained HTML (+ the viewer/AI client)
+│   ├── serve.py          # localhost server: static files + AI proxy (/chat, /session)
+│   └── live_session.py   # persistent Claude Code stream-json session wrapper
+├── pages/                # generated output (git-ignored), e.g. pages/archmap.html
 ├── docs/
-│   ├── record_demos.py   # Playwright + Pillow: regenerate the README GIFs (dev-only)
 │   └── *.gif             # the demo GIFs above
+├── LICENSE
 └── README.md
 ```
-
-> The demo GIFs are the only thing that needs extra packages, and only to
-> **regenerate** them: `pip install playwright pillow && python -m playwright
-install chromium`, then `python docs/record_demos.py` (build the map first).
-> The tool itself stays zero-dependency.
 
 ## Privacy & security
 

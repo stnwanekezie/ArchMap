@@ -118,6 +118,7 @@ class Node:
     signature: str = ""
     docstring: str = ""  # first line only, trimmed
     source: str = ""  # full source snippet of the def
+    parent: str = ""  # id of the immediately containing module/class, "" for modules
     x: float = 0.0
     y: float = 0.0
 
@@ -287,6 +288,7 @@ class _ModuleVisitor:
                 signature=f"class {cls.name}",
                 docstring=_first_doc_line(cls),
                 source=self._snippet(cls),
+                parent=self.mod_id,
             )
         )
         self.edges.append(Edge(self.mod_id, cid, "contains"))
@@ -318,6 +320,7 @@ class _ModuleVisitor:
                 signature=_render_signature(fn, name),
                 docstring=_first_doc_line(fn),
                 source=self._snippet(fn),
+                parent=parent,
             )
         )
         self.edges.append(Edge(parent, sid, "contains"))

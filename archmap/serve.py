@@ -33,6 +33,7 @@ from .layout import apply_layout
 from .live_session import ClaudeSession, SessionError
 from .render import render_html
 
+_PAGES_DIR = "pages"
 _HTML_NAME = "archmap.html"
 _MAX_BODY = 400_000  # generous cap for a single function's source
 _TIMEOUT = 60
@@ -345,11 +346,12 @@ def main() -> None:
 
     _load_dotenv()
 
-    html_path = os.path.join(os.getcwd(), _HTML_NAME)
+    html_path = os.path.join(os.getcwd(), _PAGES_DIR, _HTML_NAME)
     if not args.no_build or not os.path.exists(html_path):
         print("[archmap] building graph from source...")
         graph = build_graph(args.scan, os.getcwd())
         apply_layout(graph, iterations=args.iterations)
+        os.makedirs(os.path.dirname(html_path), exist_ok=True)
         render_html(graph, html_path)
         print(f"[archmap] built {len(graph.nodes)} nodes")
 
