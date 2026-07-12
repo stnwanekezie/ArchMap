@@ -64,7 +64,7 @@ neighbour to jump there.
 ## Quick start
 
 ```bash
-git clone https://github.com/<you>/archmap.git
+git clone https://github.com/stnwanekezie/archmap.git
 cd archmap
 
 # Build the map for your package (graph only, fully offline):
