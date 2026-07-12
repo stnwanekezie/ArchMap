@@ -324,4 +324,4 @@ install chromium`, then `python docs/record_demos.py` (build the map first).
 
 ## License
 
-MIT [LICENSE].
+[MIT](LICENSE).
