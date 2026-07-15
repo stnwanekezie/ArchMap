@@ -658,20 +658,42 @@ function setBusy(busy) {
   const s = document.getElementById('ai-status');
   if (s) s.textContent = busy ? thinkingLabel() : '';
 }
+// The graph already knows each node's neighbourhood; hand it to the model as
+// concrete file:line pointers instead of making it rediscover the structure.
+// For the Claude Code provider (a real agent with repo access) these are jump
+// targets it can open directly — no grep needed — so it navigates callers and
+// callees efficiently. For the stateless providers, which can't open files,
+// the same list is architectural context they otherwise couldn't reach at all.
+function ptr(id) {
+  const t = byId.get(id);
+  return t ? `${t.qualname} (${t.file}:${t.line})` : null;
+}
+function neighborhood(n) {
+  const secs = [];
+  if (n.parent) { const p = ptr(n.parent); if (p) secs.push('Contained in: ' + p); }
+  const calls = (outCalls.get(n.id) || []).map(ptr).filter(Boolean);
+  const callers = (inCalls.get(n.id) || []).map(ptr).filter(Boolean);
+  const contains = (children.get(n.id) || []).map(ptr).filter(Boolean);
+  if (calls.length) secs.push('Calls: ' + calls.join(', '));
+  if (callers.length) secs.push('Called by: ' + callers.join(', '));
+  if (contains.length) secs.push('Contains: ' + contains.join(', '));
+  if (!secs.length) return '';
+  return '\n\nRelated definitions from static analysis — open the file:line '
+    + 'pointers to read them directly if you need more depth:\n'
+    + secs.map(s => '- ' + s).join('\n');
+}
+
 function firstPrompt(n) {
   const head = 'You are a senior software engineer reading a Python codebase.\n'
     + `In 2-4 sentences, explain what this Python ${n.kind} does and its role in the system. `
     + 'Be concrete and specific; do not restate the signature.\n\n';
   if (n.source)
-    return head + `File: ${n.file}\n\n\`\`\`python\n${n.source}\n\`\`\``;
-  // Modules carry no source snippet — hand over the path, docstring and member
-  // list. Claude Code can open the file itself; local models get the outline.
-  const kids = (children.get(n.id) || []).map(id => byId.get(id))
-    .filter(Boolean).map(t => t.name);
+    return head + `File: ${n.file}\n\n\`\`\`python\n${n.source}\n\`\`\`` + neighborhood(n);
+  // Modules carry no source snippet — hand over the path and docstring; the
+  // neighbourhood block below already lists the members as file:line pointers.
   const doc = n.docstring ? `\nModule docstring: ${n.docstring}` : '';
-  const members = kids.length ? `\nTop-level members: ${kids.join(', ')}` : '';
-  return head + `Module file: ${n.file}${doc}${members}\n\n`
-    + '(You can open this file directly to read its full source.)';
+  return head + `Module file: ${n.file}${doc}` + neighborhood(n)
+    + '\n\n(You can open this file directly to read its full source.)';
 }
 async function postJSON(path, body) {
   const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },

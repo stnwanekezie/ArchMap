@@ -50,6 +50,12 @@ neighbours; click a neighbour to jump there.
 
 - **Optional AI descriptions, key-safe** — proxied server-side so no secret ever
   reaches the page. Works with a local model or your Claude Code subscription.
+- **Graph-guided prompts** — every _Describe_ prompt carries the node's
+  precomputed neighbours as `file:line` pointers. With the **Claude Code**
+  provider (a real agent with repo access) these are jump targets it opens
+  directly to trace callers and callees — no blind grep. Stateless providers
+  can't open files, so for them the same pointers serve as architectural context
+  rather than something to navigate.
 
 ## Requirements
 
@@ -161,6 +167,15 @@ model starts a new session** (context can't carry across models); and
 `ANTHROPIC_API_KEY` is stripped from the child process so it uses the
 subscription even if that variable is set. The other providers are stateless —
 the browser replays the visible history each turn.
+
+Because it can open files, Claude Code is the only provider that acts on the
+`file:line` pointers in each prompt: it follows a node's callers and callees into
+their source to answer questions that span several definitions, using the
+pointers as a map so it doesn't have to grep for structure first. The stateless
+providers (Ollama, OpenAI-compatible, Anthropic API) have **no tools** — they
+can't open files or run commands, so they reason only over the source snippet
+and the pointer list in the prompt. That list is why they still get useful
+architectural context despite the limitation, but they can't navigate beyond it.
 
 ### Environment variables (AI only)
 
